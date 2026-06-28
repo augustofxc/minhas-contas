@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Minhas Contas</title>
+<meta name="description" content="Controle de gastos e entradas do dia a dia" />
+
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#FAFAF8" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Minhas Contas" />
+<meta name="mobile-web-app-capable" content="yes" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="app">
+
+  <!-- ===================== HEADER ===================== -->
+  <header class="app-header">
+    <div class="app-header-inner">
+      <span class="app-header-title" id="screenTitle">Lançar</span>
+      <button class="icon-btn" id="menuBtn" aria-label="Mais opções">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="5" r="1.6" fill="currentColor"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/><circle cx="12" cy="19" r="1.6" fill="currentColor"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== MAIN ===================== -->
+  <main id="main">
+
+    <!-- ---------- TELA: LANÇAR ---------- -->
+    <section class="screen" id="screen-lancar" data-screen>
+      <form id="formLancamento" class="form-card" novalidate>
+
+        <div class="segmented" id="tipoSegmented">
+          <button type="button" class="segmented-btn is-active" data-tipo="saida">Saída</button>
+          <button type="button" class="segmented-btn" data-tipo="entrada">Entrada</button>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Nome</span>
+          <input type="text" id="campoNome" placeholder="Ex: Supermercado, Salário..." autocomplete="off" required />
+        </label>
+
+        <label class="field">
+          <span class="field-label">Valor</span>
+          <div class="value-input-wrap">
+            <span class="value-prefix">R$</span>
+            <input type="text" inputmode="decimal" id="campoValor" placeholder="0,00" required />
+          </div>
+        </label>
+
+        <div class="field-row">
+          <label class="field">
+            <span class="field-label">Data</span>
+            <input type="date" id="campoData" required />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Categoria</span>
+            <select id="campoCategoria"></select>
+          </label>
+        </div>
+
+        <label class="field">
+          <span class="field-label">Forma de pagamento</span>
+          <div class="chip-group" id="formaPagamentoChips">
+            <button type="button" class="chip" data-forma="Pix">Pix</button>
+            <button type="button" class="chip" data-forma="Débito">Débito</button>
+            <button type="button" class="chip" data-forma="Crédito">Crédito</button>
+            <button type="button" class="chip" data-forma="Dinheiro">Dinheiro</button>
+            <button type="button" class="chip" data-forma="Outro">Outro</button>
+          </div>
+        </label>
+
+        <label class="switch-row" id="parceladoRow">
+          <span class="field-label">É parcelado?</span>
+          <span class="switch">
+            <input type="checkbox" id="campoParcelado" />
+            <span class="switch-track"><span class="switch-thumb"></span></span>
+          </span>
+        </label>
+
+        <div class="field-row" id="parcelasFields" hidden>
+          <label class="field">
+            <span class="field-label">Nº de parcelas</span>
+            <input type="number" id="campoNumParcelas" min="2" max="60" placeholder="Ex: 12" />
+          </label>
+          <label class="field">
+            <span class="field-label">Parcelas já pagas</span>
+            <input type="number" id="campoParcelasPagas" min="0" placeholder="Ex: 0" />
+          </label>
+        </div>
+        <p class="hint" id="parceladoHint" hidden>O valor informado acima é o valor de <strong>cada parcela</strong>.</p>
+
+        <label class="field">
+          <span class="field-label">Observação (opcional)</span>
+          <input type="text" id="campoObs" placeholder="Algum detalhe extra..." autocomplete="off" />
+        </label>
+
+        <button type="submit" class="btn-primary" id="btnSalvarLancamento">Salvar lançamento</button>
+      </form>
+    </section>
+
+    <!-- ---------- TELA: HISTÓRICO ---------- -->
+    <section class="screen" id="screen-historico" data-screen hidden>
+      <div class="screen-toolbar">
+        <div class="filter-scroll" id="filtroCategorias"></div>
+        <button class="icon-btn-outline" id="btnFiltroAvancado" aria-label="Filtrar por mês">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M7 12h10M10 18h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+      <div id="listaHistorico" class="lista-container"></div>
+      <div class="empty-state" id="emptyHistorico" hidden>
+        <p class="empty-title">Nada por aqui ainda</p>
+        <p class="empty-text">Os lançamentos que você salvar vão aparecer aqui, organizados por dia.</p>
+      </div>
+    </section>
+
+    <!-- ---------- TELA: RESUMO ---------- -->
+    <section class="screen" id="screen-resumo" data-screen hidden>
+      <div class="month-switcher">
+        <button class="icon-btn" id="resumoMesAnterior" aria-label="Mês anterior">‹</button>
+        <span class="month-switcher-label" id="resumoMesLabel">Junho 2026</span>
+        <button class="icon-btn" id="resumoMesProximo" aria-label="Mês seguinte">›</button>
+      </div>
+
+      <div class="balance-card">
+        <span class="balance-label">Saldo do mês</span>
+        <span class="balance-value" id="resumoSaldo">R$ 0,00</span>
+        <div class="balance-sub">
+          <span class="balance-sub-item in"><span class="dot"></span>Entrou <strong id="resumoEntrou">R$ 0,00</strong></span>
+          <span class="balance-sub-item out"><span class="dot"></span>Saiu <strong id="resumoSaiu">R$ 0,00</strong></span>
+        </div>
+      </div>
+
+      <h3 class="section-title">Por forma de pagamento</h3>
+      <div class="payment-grid" id="resumoFormaPagamento"></div>
+
+      <h3 class="section-title">Por categoria</h3>
+      <div class="category-list" id="resumoCategorias"></div>
+    </section>
+
+    <!-- ---------- TELA: PARCELAS ---------- -->
+    <section class="screen" id="screen-parcelas" data-screen hidden>
+      <div id="listaParcelas" class="lista-container"></div>
+      <div class="empty-state" id="emptyParcelas" hidden>
+        <p class="empty-title">Nenhuma conta parcelada</p>
+        <p class="empty-text">Quando você marcar um lançamento como parcelado, ele aparece aqui com o progresso das parcelas.</p>
+      </div>
+    </section>
+
+    <!-- ---------- TELA: PROJEÇÃO ---------- -->
+    <section class="screen" id="screen-projecao" data-screen hidden>
+      <p class="screen-intro">Projeção até dezembro de <span id="projecaoAno"></span>, somando parcelas futuras já cadastradas e despesas fixas que você marcar como recorrentes.</p>
+      <div id="listaProjecao" class="lista-container"></div>
+    </section>
+
+  </main>
+
+  <!-- ===================== NAV ===================== -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="nav-btn is-active" data-target="lancar">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span>Lançar</span>
+    </button>
+    <button class="nav-btn" data-target="historico">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span>Histórico</span>
+    </button>
+    <button class="nav-btn" data-target="resumo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 20V10M12 20V4M20 20v-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span>Resumo</span>
+    </button>
+    <button class="nav-btn" data-target="parcelas">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" stroke-width="2.2"/><path d="M3 10h18" stroke="currentColor" stroke-width="2.2"/></svg>
+      <span>Parcelas</span>
+    </button>
+    <button class="nav-btn" data-target="projecao">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 17l4-5 4 3 5-7 3 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span>Projeção</span>
+    </button>
+  </nav>
+
+</div>
+
+<!-- ===================== MODAL: EDITAR/EXCLUIR ===================== -->
+<div class="modal-overlay" id="modalOverlay" hidden>
+  <div class="modal-sheet" id="modalSheet">
+    <div class="modal-handle"></div>
+    <div id="modalConteudo"></div>
+  </div>
+</div>
+
+<!-- ===================== MODAL: FILTRO DE MÊS (histórico) ===================== -->
+<div class="modal-overlay" id="modalMesOverlay" hidden>
+  <div class="modal-sheet" id="modalMesSheet">
+    <div class="modal-handle"></div>
+    <h3 class="modal-title">Filtrar por mês</h3>
+    <div class="month-grid" id="modalMesGrid"></div>
+    <button class="btn-secondary" id="btnLimparFiltroMes">Ver todos os períodos</button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: MENU (cabeçalho) ===================== -->
+<div class="modal-overlay" id="modalMenuOverlay" hidden>
+  <div class="modal-sheet" id="modalMenuSheet">
+    <div class="modal-handle"></div>
+    <button class="menu-item" id="menuExportar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 21h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Exportar meus dados (backup)
+    </button>
+    <button class="menu-item" id="menuImportar">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 3h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Importar backup
+    </button>
+    <input type="file" id="inputImportar" accept="application/json" hidden />
+    <button class="menu-item menu-item-danger" id="menuLimparTudo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2m1 0l-1 14H8L7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Limpar todos os dados
+    </button>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
