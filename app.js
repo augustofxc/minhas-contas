@@ -10,11 +10,12 @@
      CONSTANTES E ESTADO
   ------------------------------------------------------------------ */
   const STORAGE_KEY = "minhasContas_lancamentos_v1";
-  const CATEGORIAS_SAIDA = [
+  const CATEGORIAS_KEY = "minhasContas_categoriasExtra_v1";
+  const CATEGORIAS_SAIDA_BASE = [
     "Alimentação", "Moradia", "Transporte", "Saúde", "Lazer",
     "Educação", "Compras", "Contas fixas", "Outros"
   ];
-  const CATEGORIAS_ENTRADA = [
+  const CATEGORIAS_ENTRADA_BASE = [
     "Salário", "Freelance", "Vendas", "Investimentos", "Outros"
   ];
   const MESES = [
@@ -23,6 +24,7 @@
   ];
   const DIAS_SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
+  let categoriasExtra = { saida: [], entrada: [] }; // categorias customizadas pelo usuário
   let lancamentos = [];          // array de objetos lançamento
   let tipoAtual = "saida";       // "saida" | "entrada" — tela de lançar
   let formaSelecionada = "Pix";
@@ -119,6 +121,19 @@
       console.error("Erro ao carregar dados salvos:", e);
       lancamentos = [];
     }
+
+    try {
+      const rawCat = localStorage.getItem(CATEGORIAS_KEY);
+      const parsed = rawCat ? JSON.parse(rawCat) : null;
+      if (parsed && Array.isArray(parsed.saida) && Array.isArray(parsed.entrada)) {
+        categoriasExtra = parsed;
+      } else {
+        categoriasExtra = { saida: [], entrada: [] };
+      }
+    } catch (e) {
+      console.error("Erro ao carregar categorias extras:", e);
+      categoriasExtra = { saida: [], entrada: [] };
+    }
   }
 
   function salvarDados() {
@@ -130,6 +145,42 @@
       mostrarToast("Não consegui salvar — espaço de armazenamento pode estar cheio.");
       return false;
     }
+  }
+
+  function salvarCategoriasExtra() {
+    try {
+      localStorage.setItem(CATEGORIAS_KEY, JSON.stringify(categoriasExtra));
+      return true;
+    } catch (e) {
+      console.error("Erro ao salvar categorias extras:", e);
+      return false;
+    }
+  }
+
+  function listaCategorias(tipo) {
+    const base = tipo === "entrada" ? CATEGORIAS_ENTRADA_BASE : CATEGORIAS_SAIDA_BASE;
+    const extras = tipo === "entrada" ? categoriasExtra.entrada : categoriasExtra.saida;
+    // categorias extras aparecem antes de "Outros", que fica sempre por último
+    const semOutros = base.filter((c) => c !== "Outros");
+    return [...semOutros, ...extras, "Outros"];
+  }
+
+  function adicionarCategoriaExtra(tipo, nomeCategoria) {
+    const nome = nomeCategoria.trim();
+    if (!nome) return { ok: false, motivo: "vazio" };
+
+    const todasExistentes = listaCategorias(tipo).map((c) => c.toLowerCase());
+    if (todasExistentes.includes(nome.toLowerCase())) {
+      return { ok: false, motivo: "duplicada" };
+    }
+
+    if (tipo === "entrada") {
+      categoriasExtra.entrada.push(nome);
+    } else {
+      categoriasExtra.saida.push(nome);
+    }
+    salvarCategoriasExtra();
+    return { ok: true };
   }
 
   /* ------------------------------------------------------------------
@@ -219,13 +270,19 @@
     set resumoData(v) { resumoData = v; },
     get editandoId() { return editandoId; },
     set editandoId(v) { editandoId = v; },
-    CATEGORIAS_SAIDA, CATEGORIAS_ENTRADA, MESES, DIAS_SEMANA,
+    CATEGORIAS_SAIDA_BASE, CATEGORIAS_ENTRADA_BASE, MESES, DIAS_SEMANA,
     uid, formatarMoeda, parseValorInput, hojeISO, parseDataLocal,
     formatarDataLabel, formatarDataCurta, escapeHtml, mostrarToast, vibrarLeve,
     carregarDados, salvarDados,
     criarLancamentoSimples, criarLancamentoParcelado,
-    getLancamento, removerLancamento, removerGrupo
+    getLancamento, removerLancamento, removerGrupo,
+    listaCategorias, adicionarCategoriaExtra,
+    get categoriasExtra() { return categoriasExtra; }
   };
+
+  // carrega lançamentos e categorias extras do localStorage ANTES de qualquer
+  // outra parte do script popular telas/selects — evita categorias "somem" no reload
+  carregarDados();
 })();
 
 /* ==========================================================================
@@ -276,9 +333,75 @@
   ------------------------------------------------------------------ */
   function popularCategorias() {
     const select = document.getElementById("campoCategoria");
-    const lista = A.tipoAtual === "entrada" ? A.CATEGORIAS_ENTRADA : A.CATEGORIAS_SAIDA;
-    select.innerHTML = lista.map((c) => `<option value="${c}">${c}</option>`).join("");
+    const lista = A.listaCategorias(A.tipoAtual);
+    const optionsHtml = lista.map((c) => `<option value="${c}">${c}</option>`).join("");
+    select.innerHTML = optionsHtml + `<option value="__nova__">+ Extra (criar categoria)</option>`;
   }
+
+  function abrirModalNovaCategoria(tipo, onCriada, onCancelar) {
+    document.getElementById("modalConteudo").innerHTML = `
+      <h3 class="modal-title">Nova categoria</h3>
+      <form class="edit-form" id="formNovaCategoria">
+        <label class="field">
+          <span class="field-label">Nome da categoria</span>
+          <input type="text" id="novaCategoriaNome" placeholder="Ex: Pet, Viagem, Academia..." autocomplete="off" required />
+        </label>
+        <p class="hint" id="novaCategoriaErro" style="color:var(--terracotta);" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="btnCancelarNovaCategoria">Cancelar</button>
+          <button type="submit" class="btn-primary" style="margin-top:0;flex:1;">Criar categoria</button>
+        </div>
+      </form>
+    `;
+    document.getElementById("modalOverlay").hidden = false;
+    document.getElementById("novaCategoriaNome").focus();
+
+    document.getElementById("btnCancelarNovaCategoria").addEventListener("click", () => {
+      window.__fecharModal();
+      if (onCancelar) onCancelar();
+    });
+
+    document.getElementById("formNovaCategoria").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const nome = document.getElementById("novaCategoriaNome").value;
+      const resultado = A.adicionarCategoriaExtra(tipo, nome);
+
+      if (!resultado.ok) {
+        const erroEl = document.getElementById("novaCategoriaErro");
+        erroEl.hidden = false;
+        erroEl.textContent = resultado.motivo === "duplicada"
+          ? "Essa categoria já existe."
+          : "Dá um nome pra categoria.";
+        return;
+      }
+
+      window.__fecharModal();
+      A.mostrarToast(`Categoria "${nome.trim()}" criada ✓`);
+      if (onCriada) onCriada(nome.trim());
+    });
+
+    // se o usuário fechar o modal clicando fora, tratamos como cancelar
+    document.getElementById("modalOverlay").addEventListener("click", function handler(e) {
+      if (e.target.id === "modalOverlay") {
+        document.getElementById("modalOverlay").removeEventListener("click", handler);
+        if (onCancelar) onCancelar();
+      }
+    });
+  }
+  window.__abrirModalNovaCategoria = abrirModalNovaCategoria;
+
+  document.getElementById("campoCategoria").addEventListener("change", (e) => {
+    if (e.target.value === "__nova__") {
+      const valorAnterior = A.listaCategorias(A.tipoAtual)[0];
+      abrirModalNovaCategoria(A.tipoAtual, (nomeCriado) => {
+        popularCategorias();
+        document.getElementById("campoCategoria").value = nomeCriado;
+      }, () => {
+        popularCategorias();
+        document.getElementById("campoCategoria").value = valorAnterior;
+      });
+    }
+  });
 
   document.getElementById("tipoSegmented").addEventListener("click", (e) => {
     const btn = e.target.closest(".segmented-btn");
@@ -446,11 +569,15 @@
   "use strict";
   const A = window.__app;
 
-  const TODAS_CATEGORIAS = [...new Set([...A.CATEGORIAS_SAIDA, ...A.CATEGORIAS_ENTRADA])];
+  function todasCategoriasDisponiveis() {
+    return [...new Set([...A.listaCategorias("saida"), ...A.listaCategorias("entrada")])]
+      .filter((c) => c !== "Outros")
+      .concat(["Outros"]);
+  }
 
   function renderFiltrosCategoria() {
     const wrap = document.getElementById("filtroCategorias");
-    const cats = ["todas", ...TODAS_CATEGORIAS];
+    const cats = ["todas", ...todasCategoriasDisponiveis()];
     wrap.innerHTML = cats.map((c) => {
       const label = c === "todas" ? "Todas" : c;
       const ativo = A.filtroCategoriaHistorico === c ? "is-active" : "";
@@ -591,7 +718,7 @@
     if (!l) return;
     A.editandoId = id;
 
-    const cats = l.tipo === "entrada" ? A.CATEGORIAS_ENTRADA : A.CATEGORIAS_SAIDA;
+    const cats = A.listaCategorias(l.tipo);
     const formas = ["Pix", "Débito", "Crédito", "Dinheiro", "Outro"];
 
     const avisoParcelado = l.parcelado ? `
@@ -621,6 +748,7 @@
             <span class="field-label">Categoria</span>
             <select id="editCategoria">
               ${cats.map((c) => `<option value="${c}" ${c === l.categoria ? "selected" : ""}>${c}</option>`).join("")}
+              <option value="__nova__">+ Extra (criar categoria)</option>
             </select>
           </label>
         </div>
@@ -675,6 +803,26 @@
       const reais = digits.slice(0, -2).replace(/\B(?=(\d{3})+(?!\d))/g, ".");
       const centavos = digits.slice(-2);
       e.target.value = `${reais},${centavos}`;
+    });
+
+    // permite criar categoria nova direto no modal de edição
+    document.getElementById("editCategoria").addEventListener("change", (e) => {
+      if (e.target.value === "__nova__") {
+        const valorAnterior = l.categoria;
+        window.__abrirModalNovaCategoria(l.tipo, (nomeCriado) => {
+          abrirModalEdicao(id);
+          setTimeout(() => {
+            const sel = document.getElementById("editCategoria");
+            if (sel) sel.value = nomeCriado;
+          }, 0);
+        }, () => {
+          abrirModalEdicao(id);
+          setTimeout(() => {
+            const sel = document.getElementById("editCategoria");
+            if (sel) sel.value = valorAnterior;
+          }, 0);
+        });
+      }
     });
   }
 
@@ -794,7 +942,7 @@
     const saldo = totalEntrou - totalSaiu;
 
     document.getElementById("resumoSaldo").textContent = A.formatarMoeda(saldo);
-    document.getElementById("resumoSaldo").style.color = saldo < 0 ? "#E2917D" : "#FFFFFF";
+    document.getElementById("resumoSaldo").style.color = saldo < 0 ? "#E0463E" : "#F2F1ED";
     document.getElementById("resumoEntrou").textContent = A.formatarMoeda(totalEntrou);
     document.getElementById("resumoSaiu").textContent = A.formatarMoeda(totalSaiu);
 
@@ -1146,8 +1294,6 @@
 (function () {
   "use strict";
   const A = window.__app;
-
-  A.carregarDados();
 
   // garante que o formulário de lançar comece correto
   document.getElementById("campoData").value = A.hojeISO();
