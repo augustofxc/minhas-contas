@@ -227,10 +227,29 @@
       Importar backup
     </button>
     <input type="file" id="inputImportar" accept="application/json" hidden />
+    <button class="menu-item" id="menuGerenciarCategorias">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M4 6h7M4 12h7M4 18h7M17 5l3 3-3 3M20 8h-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Gerenciar categorias
+    </button>
     <button class="menu-item menu-item-danger" id="menuLimparTudo">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2m1 0l-1 14H8L7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Limpar todos os dados
     </button>
+  </div>
+</div>
+
+<!-- ===================== MODAL: GERENCIAR CATEGORIAS ===================== -->
+<div class="modal-overlay" id="modalCategoriasOverlay" hidden>
+  <div class="modal-sheet" id="modalCategoriasSheet">
+    <div class="modal-handle"></div>
+    <h3 class="modal-title">Gerenciar categorias</h3>
+
+    <div class="segmented" id="categoriasTipoSegmented">
+      <button type="button" class="segmented-btn is-active" data-tipo="saida">Saída</button>
+      <button type="button" class="segmented-btn" data-tipo="entrada">Entrada</button>
+    </div>
+
+    <div id="listaCategoriasGerenciar" class="categoria-gerenciar-list"></div>
   </div>
 </div>
 

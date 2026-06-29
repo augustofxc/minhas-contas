@@ -672,6 +672,13 @@ button, input, select {
   animation: fadeIn 0.15s ease;
 }
 
+/* modalOverlay é reaproveitado para confirmações críticas (excluir item, excluir
+   categoria, limpar tudo) e por isso precisa ficar sempre acima de outros
+   modais secundários, como o de gerenciar categorias */
+#modalOverlay {
+  z-index: 60;
+}
+
 .modal-sheet {
   background: var(--surface);
   width: 100%;
@@ -716,6 +723,57 @@ button, input, select {
 }
 .menu-item:last-child { border-bottom: none; }
 .menu-item-danger { color: var(--terracotta); }
+
+.categoria-gerenciar-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 50vh;
+  overflow-y: auto;
+  margin-top: 16px;
+  padding-bottom: 4px;
+}
+
+.categoria-gerenciar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+}
+
+.categoria-gerenciar-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.categoria-gerenciar-nome { font-size: 14.5px; font-weight: 600; }
+.categoria-gerenciar-origem { font-size: 11.5px; color: var(--ink-soft); }
+
+.categoria-gerenciar-excluir {
+  flex-shrink: 0;
+  border: none;
+  background: var(--terracotta-bg);
+  color: var(--terracotta);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.categoria-gerenciar-excluir:active { opacity: 0.7; }
+
+.categoria-gerenciar-excluir.is-protegida {
+  background: var(--line);
+  color: var(--ink-soft);
+  opacity: 0.5;
+}
+
+.categoria-gerenciar-empty {
+  text-align: center;
+  padding: 30px 10px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
 
 .month-grid {
   display: grid;

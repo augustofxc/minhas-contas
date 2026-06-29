@@ -11,6 +11,7 @@
   ------------------------------------------------------------------ */
   const STORAGE_KEY = "minhasContas_lancamentos_v1";
   const CATEGORIAS_KEY = "minhasContas_categoriasExtra_v1";
+  const CATEGORIAS_OCULTAS_KEY = "minhasContas_categoriasOcultas_v1";
   const CATEGORIAS_SAIDA_BASE = [
     "Alimentação", "Moradia", "Transporte", "Saúde", "Lazer",
     "Educação", "Compras", "Contas fixas", "Outros"
@@ -24,7 +25,8 @@
   ];
   const DIAS_SEMANA = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
 
-  let categoriasExtra = { saida: [], entrada: [] }; // categorias customizadas pelo usuário
+  let categoriasExtra = { saida: [], entrada: [] };  // categorias customizadas pelo usuário
+  let categoriasOcultas = { saida: [], entrada: [] }; // categorias (padrão ou extra) excluídas pelo usuário
   let lancamentos = [];          // array de objetos lançamento
   let tipoAtual = "saida";       // "saida" | "entrada" — tela de lançar
   let formaSelecionada = "Pix";
@@ -134,6 +136,19 @@
       console.error("Erro ao carregar categorias extras:", e);
       categoriasExtra = { saida: [], entrada: [] };
     }
+
+    try {
+      const rawOcultas = localStorage.getItem(CATEGORIAS_OCULTAS_KEY);
+      const parsedOcultas = rawOcultas ? JSON.parse(rawOcultas) : null;
+      if (parsedOcultas && Array.isArray(parsedOcultas.saida) && Array.isArray(parsedOcultas.entrada)) {
+        categoriasOcultas = parsedOcultas;
+      } else {
+        categoriasOcultas = { saida: [], entrada: [] };
+      }
+    } catch (e) {
+      console.error("Erro ao carregar categorias ocultas:", e);
+      categoriasOcultas = { saida: [], entrada: [] };
+    }
   }
 
   function salvarDados() {
@@ -157,12 +172,72 @@
     }
   }
 
+  function salvarCategoriasOcultas() {
+    try {
+      localStorage.setItem(CATEGORIAS_OCULTAS_KEY, JSON.stringify(categoriasOcultas));
+      return true;
+    } catch (e) {
+      console.error("Erro ao salvar categorias ocultas:", e);
+      return false;
+    }
+  }
+
   function listaCategorias(tipo) {
     const base = tipo === "entrada" ? CATEGORIAS_ENTRADA_BASE : CATEGORIAS_SAIDA_BASE;
     const extras = tipo === "entrada" ? categoriasExtra.entrada : categoriasExtra.saida;
+    const ocultas = tipo === "entrada" ? categoriasOcultas.entrada : categoriasOcultas.saida;
     // categorias extras aparecem antes de "Outros", que fica sempre por último
     const semOutros = base.filter((c) => c !== "Outros");
-    return [...semOutros, ...extras, "Outros"];
+    const todas = [...semOutros, ...extras, "Outros"];
+    return todas.filter((c) => !ocultas.includes(c));
+  }
+
+  function listaCategoriasParaGerenciar(tipo) {
+    // retorna todas as categorias (mesmo ocultas não entram aqui pq já foram excluídas),
+    // junto com a info de serem base (padrão) ou extra (criada pelo usuário)
+    const base = tipo === "entrada" ? CATEGORIAS_ENTRADA_BASE : CATEGORIAS_SAIDA_BASE;
+    const extras = tipo === "entrada" ? categoriasExtra.entrada : categoriasExtra.saida;
+    const ocultas = tipo === "entrada" ? categoriasOcultas.entrada : categoriasOcultas.saida;
+
+    const semOutros = base.filter((c) => c !== "Outros");
+    const lista = [
+      ...semOutros.map((nome) => ({ nome, origem: "padrão" })),
+      ...extras.map((nome) => ({ nome, origem: "criada por você" })),
+      { nome: "Outros", origem: "padrão" }
+    ];
+    return lista.filter((item) => !ocultas.includes(item.nome));
+  }
+
+  function excluirCategoria(tipo, nomeCategoria) {
+    if (nomeCategoria === "Outros") {
+      return { ok: false, motivo: "protegida" };
+    }
+
+    const isExtra = (tipo === "entrada" ? categoriasExtra.entrada : categoriasExtra.saida).includes(nomeCategoria);
+
+    if (isExtra) {
+      // remove de vez da lista de extras
+      if (tipo === "entrada") {
+        categoriasExtra.entrada = categoriasExtra.entrada.filter((c) => c !== nomeCategoria);
+      } else {
+        categoriasExtra.saida = categoriasExtra.saida.filter((c) => c !== nomeCategoria);
+      }
+      salvarCategoriasExtra();
+    } else {
+      // categoria padrão: não dá pra remover da constante, então marcamos como oculta
+      if (tipo === "entrada") {
+        if (!categoriasOcultas.entrada.includes(nomeCategoria)) categoriasOcultas.entrada.push(nomeCategoria);
+      } else {
+        if (!categoriasOcultas.saida.includes(nomeCategoria)) categoriasOcultas.saida.push(nomeCategoria);
+      }
+      salvarCategoriasOcultas();
+    }
+
+    return { ok: true };
+  }
+
+  function contarLancamentosPorCategoria(tipo, nomeCategoria) {
+    return lancamentos.filter((l) => l.tipo === tipo && l.categoria === nomeCategoria).length;
   }
 
   function adicionarCategoriaExtra(tipo, nomeCategoria) {
@@ -276,7 +351,8 @@
     carregarDados, salvarDados,
     criarLancamentoSimples, criarLancamentoParcelado,
     getLancamento, removerLancamento, removerGrupo,
-    listaCategorias, adicionarCategoriaExtra,
+    listaCategorias, listaCategoriasParaGerenciar, adicionarCategoriaExtra,
+    excluirCategoria, contarLancamentosPorCategoria,
     get categoriasExtra() { return categoriasExtra; }
   };
 
@@ -1237,6 +1313,99 @@
   document.getElementById("menuImportar").addEventListener("click", () => {
     document.getElementById("inputImportar").click();
   });
+
+  /* ---------------- gerenciar categorias ---------------- */
+  let categoriasTipoAtual = "saida";
+
+  function renderListaCategoriasGerenciar() {
+    const lista = A.listaCategoriasParaGerenciar(categoriasTipoAtual);
+    const container = document.getElementById("listaCategoriasGerenciar");
+
+    if (lista.length === 0) {
+      container.innerHTML = `<p class="categoria-gerenciar-empty">Nenhuma categoria por aqui.</p>`;
+      return;
+    }
+
+    container.innerHTML = lista.map((item) => {
+      const protegida = item.nome === "Outros";
+      return `
+        <div class="categoria-gerenciar-row">
+          <div class="categoria-gerenciar-info">
+            <span class="categoria-gerenciar-nome">${A.escapeHtml(item.nome)}</span>
+            <span class="categoria-gerenciar-origem">${item.origem}</span>
+          </div>
+          <button class="categoria-gerenciar-excluir ${protegida ? "is-protegida" : ""}"
+                  data-nome="${A.escapeHtml(item.nome)}"
+                  ${protegida ? "disabled" : ""}
+                  aria-label="Excluir categoria ${A.escapeHtml(item.nome)}">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4h8v2m1 0l-1 14H8L7 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      `;
+    }).join("");
+  }
+
+  document.getElementById("menuGerenciarCategorias").addEventListener("click", () => {
+    document.getElementById("modalMenuOverlay").hidden = true;
+    categoriasTipoAtual = "saida";
+    document.querySelectorAll("#categoriasTipoSegmented .segmented-btn").forEach((b) =>
+      b.classList.toggle("is-active", b.dataset.tipo === "saida")
+    );
+    renderListaCategoriasGerenciar();
+    document.getElementById("modalCategoriasOverlay").hidden = false;
+  });
+
+  document.getElementById("categoriasTipoSegmented").addEventListener("click", (e) => {
+    const btn = e.target.closest(".segmented-btn");
+    if (!btn) return;
+    categoriasTipoAtual = btn.dataset.tipo;
+    document.querySelectorAll("#categoriasTipoSegmented .segmented-btn").forEach((b) =>
+      b.classList.toggle("is-active", b === btn)
+    );
+    renderListaCategoriasGerenciar();
+  });
+
+  document.getElementById("modalCategoriasOverlay").addEventListener("click", (e) => {
+    if (e.target.id === "modalCategoriasOverlay") {
+      document.getElementById("modalCategoriasOverlay").hidden = true;
+      return;
+    }
+
+    const btnExcluir = e.target.closest(".categoria-gerenciar-excluir");
+    if (!btnExcluir || btnExcluir.disabled) return;
+
+    const nomeCategoria = btnExcluir.dataset.nome;
+    confirmarExclusaoCategoria(categoriasTipoAtual, nomeCategoria);
+  });
+
+  function confirmarExclusaoCategoria(tipo, nomeCategoria) {
+    const qtd = A.contarLancamentosPorCategoria(tipo, nomeCategoria);
+    const avisoUso = qtd > 0
+      ? `Há ${qtd} ${qtd === 1 ? "lançamento" : "lançamentos"} usando essa categoria. ${qtd === 1 ? "Ele" : "Eles"} não ${qtd === 1 ? "será" : "serão"} apagado${qtd === 1 ? "" : "s"} — só não vai mais aparecer pra escolher em novos lançamentos.`
+      : "Essa categoria não tem nenhum lançamento ainda.";
+
+    document.getElementById("modalConteudo").innerHTML = `
+      <h3 class="modal-title">Excluir "${A.escapeHtml(nomeCategoria)}"?</h3>
+      <p class="hint" style="margin-bottom:18px;">${avisoUso}</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" id="btnCancelarExclusaoCategoria">Cancelar</button>
+        <button class="btn-primary" id="btnConfirmarExclusaoCategoria" style="margin-top:0;background:var(--terracotta);">Excluir</button>
+      </div>
+    `;
+    document.getElementById("modalOverlay").hidden = false;
+
+    document.getElementById("btnCancelarExclusaoCategoria").addEventListener("click", () => {
+      window.__fecharModal();
+    });
+    document.getElementById("btnConfirmarExclusaoCategoria").addEventListener("click", () => {
+      A.excluirCategoria(tipo, nomeCategoria);
+      window.__fecharModal();
+      A.mostrarToast(`Categoria "${nomeCategoria}" excluída ✓`);
+      renderListaCategoriasGerenciar();
+      if (window.__popularCategorias) window.__popularCategorias();
+      if (window.__renderHistorico) window.__renderHistorico();
+    });
+  }
 
   document.getElementById("inputImportar").addEventListener("change", (e) => {
     const file = e.target.files[0];
