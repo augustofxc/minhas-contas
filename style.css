@@ -544,8 +544,30 @@ button, input, select {
   font-size: 14px;
   margin-bottom: 8px;
 }
+.category-row-toggle {
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 0 0 8px;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+  align-items: center;
+}
 .category-row-top .cat-name { font-weight: 600; }
 .category-row-top .cat-value { font-family: var(--font-display); font-weight: 600; }
+.category-row-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.category-chevron {
+  color: var(--ink-soft);
+  transition: transform 0.18s ease;
+  flex-shrink: 0;
+}
+.category-chevron.is-open { transform: rotate(180deg); }
 .category-bar-track {
   height: 6px;
   background: var(--line);
@@ -553,6 +575,16 @@ button, input, select {
   overflow: hidden;
 }
 .category-bar-fill { height: 100%; border-radius: 999px; background: var(--blue-gray); }
+
+.category-itens-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  animation: fadeIn 0.15s ease;
+}
 
 /* ============================================================
    PARCELAS

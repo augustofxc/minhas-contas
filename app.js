@@ -982,6 +982,7 @@
 (function () {
   "use strict";
   const A = window.__app;
+  let categoriaExpandida = null; // nome da categoria atualmente expandida no resumo, ou null
 
   function lancamentosDoMes(ano, mes) {
     return A.lancamentos.filter((l) => {
@@ -1042,22 +1043,72 @@
     const catsOrdenadas = Object.entries(porCategoria).sort((a, b) => b[1] - a[1]);
     if (catsOrdenadas.length === 0) {
       catList.innerHTML = `<p class="hint">Nenhuma saída registrada neste mês.</p>`;
+      categoriaExpandida = null;
     } else {
       const maior = catsOrdenadas[0][1];
+      // se a categoria expandida não existe mais neste mês (ex: foi a última saída dela
+      // e acabou de ser excluída), fecha a expansão automaticamente
+      if (categoriaExpandida && !catsOrdenadas.some(([cat]) => cat === categoriaExpandida)) {
+        categoriaExpandida = null;
+      }
+
       catList.innerHTML = catsOrdenadas.map(([cat, valor]) => {
         const pct = maior > 0 ? Math.max(4, Math.round((valor / maior) * 100)) : 0;
+        const expandida = cat === categoriaExpandida;
+        const itensCategoria = itens
+          .filter((l) => l.tipo === "saida" && l.categoria === cat)
+          .sort((a, b) => b.data.localeCompare(a.data) || b.id.localeCompare(a.id));
+
+        const itensHtml = itensCategoria.map((l) => {
+          let meta = `${A.formatarDataCurta(l.data)} · ${l.forma}`;
+          if (l.parcelado) meta += ` · parcela ${l.parcelaIndice}/${l.parcelaTotal}`;
+          return `
+            <button class="item-card" data-id="${l.id}" type="button">
+              <span class="item-icon out">↓</span>
+              <span class="item-body">
+                <span class="item-name">${A.escapeHtml(l.nome)}</span>
+                <span class="item-meta">${meta}</span>
+              </span>
+              <span class="item-value out">− ${A.formatarMoeda(l.valor)}</span>
+            </button>
+          `;
+        }).join("");
+
         return `
           <div class="category-row">
-            <div class="category-row-top">
+            <button class="category-row-top category-row-toggle" type="button" data-cat="${A.escapeHtml(cat)}">
               <span class="cat-name">${cat}</span>
-              <span class="cat-value">${A.formatarMoeda(valor)}</span>
-            </div>
+              <span class="category-row-right">
+                <span class="cat-value">${A.formatarMoeda(valor)}</span>
+                <svg class="category-chevron ${expandida ? "is-open" : ""}" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+            </button>
             <div class="category-bar-track"><div class="category-bar-fill" style="width:${pct}%"></div></div>
+            ${expandida ? `
+              <div class="category-itens-list">
+                ${itensHtml || `<p class="hint" style="margin:8px 0 2px;">Nenhum lançamento encontrado.</p>`}
+              </div>
+            ` : ""}
           </div>
         `;
       }).join("");
     }
   }
+
+  document.getElementById("resumoCategorias").addEventListener("click", (e) => {
+    const toggleBtn = e.target.closest(".category-row-toggle");
+    if (toggleBtn) {
+      const cat = toggleBtn.dataset.cat;
+      categoriaExpandida = categoriaExpandida === cat ? null : cat;
+      renderResumo();
+      return;
+    }
+
+    const itemCard = e.target.closest(".item-card");
+    if (itemCard && window.__abrirModalEdicaoPublic) {
+      window.__abrirModalEdicaoPublic(itemCard.dataset.id);
+    }
+  });
 
   document.getElementById("resumoMesAnterior").addEventListener("click", () => {
     A.resumoData = new Date(A.resumoData.getFullYear(), A.resumoData.getMonth() - 1, 1);
